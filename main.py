@@ -103,7 +103,7 @@ class InviteForm(ui.Modal, title="🔗 一括参加 実行"):
             if ok:
                 success += 1
             results.append(f"[{i}] {msg}")
-            await asyncio.sleep(0.1)  # ✅ 0.1秒間隔
+            await asyncio.sleep(0.1)
 
         result_text = "\n".join(results[:15])
         if len(results) > 15:
@@ -143,22 +143,22 @@ class VerifyForm(ui.Modal, title="🔐 本人確認：トークンを入力"):
         await interaction.followup.send(embed=embed, ephemeral=True, view=NextView())
 
 
-# ========== 2段階目ボタン（永続化） ==========
+# ========== 2段階目ボタン ==========
 class NextView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="🔗 招待コード・トークン入力へ", style=discord.ButtonStyle.Primary, custom_id="open_invite_form")
+    @ui.button(label="🔗 招待コード・トークン入力へ", style=discord.ButtonStyle.primary, custom_id="open_invite_form")
     async def next_btn(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(InviteForm())
 
 
-# ========== 最初のパネルボタン（永続化） ==========
+# ========== 最初のパネルボタン ==========
 class MainView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="🔐 開始：トークンを入力", style=discord.ButtonStyle.Primary, custom_id="start_verify_modal")
+    @ui.button(label="🔐 開始：トークンを入力", style=discord.ButtonStyle.primary, custom_id="start_verify_modal")
     async def start_btn(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(VerifyForm())
 
@@ -168,11 +168,11 @@ class MainView(ui.View):
 async def on_ready():
     bot.add_view(MainView())
     bot.add_view(NextView())
-    await bot.tree.sync()  # ✅ スラッシュコマンドを同期
+    await bot.tree.sync()
     print(f"✅ Bot起動完了: {bot.user}")
 
 
-# ✅ スラッシュコマンド版（自分だけに表示・完全秘匿）
+# ✅ スラッシュコマンド
 @bot.tree.command(name="panel", description="トークン一括参加パネルを表示")
 async def panel(interaction: discord.Interaction):
     embed = discord.Embed(
