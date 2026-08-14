@@ -1,6 +1,5 @@
 [build]
-builder = "python"
-python_version = "3.11"
+builder = "NIXPACKS"
 
 [deploy]
 start_command = "python main.py"
