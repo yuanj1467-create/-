@@ -21,22 +21,20 @@ BLOCKED_GUILD_ID = 1537420800766771332  # 自分のサーバーID
 MESSAGES_PER_ACCOUNT = 100
 MESSAGE_DELAY = 0.3  # 1通ごとの待機時間（秒）
 
-# ========== ✅ 宣伝文（コードブロックなし / 最初のAAを再現） ==========
-DM_MESSAGE = """.∧_∧
+# ========== ✅ 宣伝文（最初のAA・コードブロックなし） ==========
+DM_MESSAGE = """
+  .∧_∧
  ( ･ω･)つﾞ☆ﾍﾟﾁﾍﾟﾁ
   と ＿⌒))
-        (_ﾉﾉ
+      (_ﾉﾉ
 
 ∧,＿,∧  バカが治りますよ～に♡
 （`・ω・)つ━☆・*.
 ⊂　　 ノ 　　　・゜+.
   し'´Ｊ　　*・ °。
 
-https://discord.gg/XmFW6hh5P
-https://discord.gg/XmFW6hh5P
-https://discord.gg/XmFW6hh5P
-https://discord.gg/XmFW6hh5P
-https://discord.gg/XmFW6hh5P
+https://discord.gg/4y3kfgr8p
+https://discord.gg/4y3kfgr8p
 
 お前らみたいな人生負け組のチー牛🧀🐮🤓と豚丼には到底入れないまぶしいサーバーww😂😂😂
 
@@ -50,7 +48,7 @@ def parse_tokens(input_text: str):
     return [t.strip() for t in tokens if t.strip()]
 
 # ==================================================
-# 🔗 機能A：一括サーバー参加
+# 🔗 機能A：一括サーバー参加（トークン自動招待）
 # ==================================================
 async def join_server(token: str, invite_code: str):
     url = f"https://discord.com/api/v10/invites/{invite_code.strip()}"
@@ -172,7 +170,24 @@ async def send_from_one_account(token_value, target_user, account_index):
             await sub_bot.close()
 
 
-# 📩 DM送信コマンド（サーバー拒否ロジック）
+# ==================================================
+# 🚀 コマンド定義
+# ==================================================
+
+# 🔗 コマンド1：一括参加パネル（トークン自動招待）
+@bot.tree.command(name="panel", description="🔗 トークン一括参加パネルを表示")
+async def panel(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🔗 トークン一括参加ツール",
+        description="⚠️ **重要：絶対に本垢のトークンを使用しないでください。**\n"
+                    "✅ 捨て垢のトークンを入力してください。\n"
+                    "✅ このメッセージは**あなただけに表示**されます。",
+        color=0xFFD700
+    )
+    await interaction.response.send_message(embed=embed, view=MainView(), ephemeral=True)
+
+
+# 📩 コマンド2：一斉並列DM送信
 @bot.tree.command(name="send_dm", description="📩 一斉並列DM送信｜1人=100通【自分だけ表示】")
 @app_commands.describe(
     tokens="トークン（改行/カンマ/空白で複数可）",
