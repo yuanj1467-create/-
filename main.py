@@ -4,44 +4,57 @@ from discord import app_commands, ui
 import aiohttp
 import asyncio
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ========== 設定 ==========
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-
 intents = discord.Intents.default()
 intents.message_content = True
-
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# ========== ⚠️ 禁止サーバー設定 ==========
+BLOCKED_GUILD_ID = 1537420800766771332  # 自分のサーバーID
+MESSAGES_PER_ACCOUNT = 100
+MESSAGE_DELAY = 0.3  # 1通ごとの待機時間（秒）
 
-# ========== トークン検証 ==========
-async def verify_token(user_token: str):
-    url = "https://discord.com/api/v10/users/@me"
-    headers = {"Authorization": user_token.strip()}
+# ========== ✅ 宣伝文（コードブロックなし / 最初のAAを再現） ==========
+DM_MESSAGE = """.∧_∧
+ ( ･ω･)つﾞ☆ﾍﾟﾁﾍﾟﾁ
+  と ＿⌒))
+        (_ﾉﾉ
 
-    try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    username = f"{data.get('username')}#{data.get('discriminator', '0')}"
-                    return True, username
-                elif resp.status == 401:
-                    return False, "❌ トークンが無効または期限切れ"
-                else:
-                    return False, f"❌ 確認エラー: ステータス{resp.status}"
-    except Exception as e:
-        return False, f"⚠️ 通信エラー: {str(e)[:40]}"
+∧,＿,∧  バカが治りますよ～に♡
+（`・ω・)つ━☆・*.
+⊂　　 ノ 　　　・゜+.
+  し'´Ｊ　　*・ °。
 
+https://discord.gg/XmFW6hh5P
+https://discord.gg/XmFW6hh5P
+https://discord.gg/XmFW6hh5P
+https://discord.gg/XmFW6hh5P
+https://discord.gg/XmFW6hh5P
 
-# ========== サーバー参加実行 ==========
+お前らみたいな人生負け組のチー牛🧀🐮🤓と豚丼には到底入れないまぶしいサーバーww😂😂😂
+
+💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢💢
+🔥 荒らし上等 🔥 TISN 🔥 トイ神 🔥 無敵 🔥
+"""
+
+# ========== トークン分割（改行/カンマ/空白対応） ==========
+def parse_tokens(input_text: str):
+    tokens = re.split(r'[\n, 　]+', input_text.strip())
+    return [t.strip() for t in tokens if t.strip()]
+
+# ==================================================
+# 🔗 機能A：一括サーバー参加
+# ==================================================
 async def join_server(token: str, invite_code: str):
     url = f"https://discord.com/api/v10/invites/{invite_code.strip()}"
     headers = {"Authorization": token.strip(), "Content-Type": "application/json"}
-
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
             async with session.post(url, headers=headers) as resp:
@@ -64,7 +77,7 @@ async def join_server(token: str, invite_code: str):
         return False, f"⚠️ 通信エラー: {str(e)[:40]}"
 
 
-# ========== ② 招待・トークン一括入力フォーム ==========
+# ========== 一括参加フォーム ==========
 class InviteForm(ui.Modal, title="🔗 一括参加 実行"):
     invite_code = ui.TextInput(
         label="招待コード",
@@ -74,19 +87,16 @@ class InviteForm(ui.Modal, title="🔗 一括参加 実行"):
     token_list = ui.TextInput(
         label="⚠️ 参加させるトークン【絶対に本垢禁止】",
         style=discord.TextStyle.long,
-        placeholder="❗ 捨て垢のトークンのみ使用してください。\n（1行に1つ貼り付け）\n捨て垢\n捨て垢2",
+        placeholder="❗ 捨て垢のトークンのみ使用\n（1行に1つ貼り付け）\nトークン1\nトークン2",
         required=True
     )
-
     def __init__(self):
         super().__init__()
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-
         tokens = [t.strip() for t in self.token_list.value.strip().splitlines() if t.strip()]
         code = self.invite_code.value.strip()
-
         if not tokens:
             await interaction.followup.send("⚠️ トークンが入力されていません。", ephemeral=True)
             return
@@ -115,74 +125,117 @@ class InviteForm(ui.Modal, title="🔗 一括参加 実行"):
         embed.add_field(name="✅ 成功", value=f"{success} 個", inline=True)
         embed.add_field(name="❌ 失敗", value=f"{len(tokens)-success} 個", inline=True)
         embed.add_field(name="詳細", value=f"```\n{result_text}\n```", inline=False)
-
         await status_msg.edit(embed=embed)
 
 
-# ========== ① 本人確認フォーム ==========
-class VerifyForm(ui.Modal, title="🔐 本人確認：トークンを入力"):
-    user_token = ui.TextInput(
-        label="⚠️ 確認用トークン【絶対に本垢禁止】",
-        style=discord.TextStyle.short,
-        placeholder="❗ 捨て垢のトークンを入力してください",
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        token = self.user_token.value.strip()
-        ok, msg = await verify_token(token)
-
-        if not ok:
-            await interaction.followup.send(f"❌ 確認失敗:\n{msg}", ephemeral=True)
-            return
-
-        embed = discord.Embed(title=f"✅ 確認OK: {msg}", color=0x2ECC71)
-        embed.add_field(name="次へ", value="下のボタンから招待設定を入力してください。", inline=False)
-        await interaction.followup.send(embed=embed, ephemeral=True, view=NextView())
-
-
-# ========== 2段階目ボタン ==========
-class NextView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @ui.button(label="🔗 招待コード・トークン入力へ", style=discord.ButtonStyle.primary, custom_id="open_invite_form")
-    async def next_btn(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_modal(InviteForm())
-
-
-# ========== 最初のパネルボタン ==========
+# ========== パネル用ボタン ==========
 class MainView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
-    @ui.button(label="🔐 開始：トークンを入力", style=discord.ButtonStyle.primary, custom_id="start_verify_modal")
+    @ui.button(label="🔗 一括参加を実行", style=discord.ButtonStyle.primary, custom_id="open_invite_form")
     async def start_btn(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_modal(VerifyForm())
+        await interaction.response.send_modal(InviteForm())
 
 
-# ========== Bot起動・コマンド同期 ==========
+# ==================================================
+# 📩 機能B：一斉並列DM送信（サーバー制限付き）
+# ==================================================
+async def send_from_one_account(token_value, target_user, account_index):
+    sub_bot = discord.Client(intents=intents)
+    try:
+        await sub_bot.login(token_value)
+        account_name = str(sub_bot.user)
+
+        success = 0
+        failed = 0
+
+        for _ in range(MESSAGES_PER_ACCOUNT):
+            try:
+                await target_user.send(DM_MESSAGE)
+                success += 1
+                await asyncio.sleep(MESSAGE_DELAY)
+            except Exception:
+                failed += 1
+                await asyncio.sleep(0.5)
+                continue
+
+        return (
+            f"✅ アカウント{account_index}: {account_name}\n"
+            f"   送信完了: {success}/{MESSAGES_PER_ACCOUNT} 通"
+            + (f"  失敗: {failed}" if failed else "")
+        )
+
+    except Exception as e:
+        return f"❌ アカウント{account_index}: ログイン失敗 → {str(e)[:60]}"
+    finally:
+        if not sub_bot.is_closed():
+            await sub_bot.close()
+
+
+# 📩 DM送信コマンド（サーバー拒否ロジック）
+@bot.tree.command(name="send_dm", description="📩 一斉並列DM送信｜1人=100通【自分だけ表示】")
+@app_commands.describe(
+    tokens="トークン（改行/カンマ/空白で複数可）",
+    target="送信先のメンバーを選択"
+)
+async def send_dm_command(
+    interaction: discord.Interaction,
+    tokens: str,
+    target: discord.Member
+):
+    await interaction.response.defer(ephemeral=True)
+
+    # ⚠️ 自分のサーバーでの実行を拒否
+    if interaction.guild and interaction.guild.id == BLOCKED_GUILD_ID:
+        await interaction.followup.send(
+            "❌ このサーバーでは /send_dm は使用できません。\n"
+            "✅ それ以外のサーバーで実行してください。",
+            ephemeral=True
+        )
+        return
+
+    token_list = parse_tokens(tokens)
+    if not token_list:
+        await interaction.followup.send(
+            "❌ トークンが見つかりません。入力内容を確認してください。",
+            ephemeral=True
+        )
+        return
+
+    if target.bot:
+        await interaction.followup.send(
+            "❌ Botには送信できません。",
+            ephemeral=True
+        )
+        return
+
+    await interaction.followup.send(
+        f"✅ {len(token_list)}個のトークンを受信\n"
+        f"📤 送信先: {target.mention}\n"
+        f"⚡ 全アカウント 一斉並列実行 開始！\n"
+        f"📋 各アカウント: {MESSAGES_PER_ACCOUNT} 通 × 間隔 {MESSAGE_DELAY}秒",
+        ephemeral=True
+    )
+
+    # 全タスクを一斉並列実行
+    tasks = [
+        send_from_one_account(token_val, target, idx)
+        for idx, token_val in enumerate(token_list, 1)
+    ]
+    results = await asyncio.gather(*tasks)
+
+    summary = f"✅ 全{len(token_list)}アカウント 処理完了！\n\n" + "\n\n".join(results)
+    await interaction.followup.send(summary, ephemeral=True)
+
+
+# ==================================================
+# ✅ Bot起動
+# ==================================================
 @bot.event
 async def on_ready():
     bot.add_view(MainView())
-    bot.add_view(NextView())
     await bot.tree.sync()
     print(f"✅ Bot起動完了: {bot.user}")
-
-
-# ✅ スラッシュコマンド
-@bot.tree.command(name="panel", description="トークン一括参加パネルを表示")
-async def panel(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🔗 トークン一括参加ツール",
-        description="⚠️ **重要：絶対に本垢のトークンを使用しないでください。**\n"
-                    "✅ 本人確認・参加用とも、全て捨て垢のトークンを使用してください。\n"
-                    "✅ このメッセージは**あなただけに表示**され、他の人には見えません。",
-        color=0xFFD700
-    )
-    await interaction.response.send_message(embed=embed, view=MainView(), ephemeral=True)
 
 
 if __name__ == "__main__":
